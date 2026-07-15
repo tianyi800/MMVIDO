@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MMVIDO - AI 视频制作画布工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: #0a0a0a;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+        
+        .tab-active {
+            background-color: #2563eb;
+            border-color: #3b82f6;
+        }
+        
+        .tab-inactive {
+            background-color: #1f2937;
+            border-color: #374151;
+        }
+        
+        .grid-pattern {
+            background-image: 
+                linear-gradient(0deg, transparent 24%, rgba(255, 0, 0, .05) 25%, rgba(255, 0, 0, .05) 26%, transparent 27%, transparent 74%, rgba(255, 0, 0, .05) 75%, rgba(255, 0, 0, .05) 76%, transparent 77%, transparent),
+                linear-gradient(90deg, transparent 24%, rgba(255, 0, 0, .05) 25%, rgba(255, 0, 0, .05) 26%, transparent 27%, transparent 74%, rgba(255, 0, 0, .05) 75%, rgba(255, 0, 0, .05) 76%, transparent 77%, transparent);
+            background-size: 50px 50px;
+        }
+    </style>
+</head>
+<body class="bg-gray-950">
+    <div id="app"></div>
+
+    <script>
+        // 状态管理
+        const state = {
+            activeTab: 'canvas',
+            isPlaying: false,
+            currentTime: 0,
+            zoom: 100,
+            showPreview: false,
+            selectedTemplate: 0,
+            selectedPreset: 0,
+            generatedPrompt: '{{subject}}, {{style}}, {{lighting}}, masterpiece, 8k, cinematic',
+        };
+
+        const templates = [
+            {
+                name: '史诗级电影场景',
+                category: 'text-to-image',
+                template: '{{subject}}, {{style}}, {{lighting}}, masterpiece, 8k, cinematic',
+            },
+            {
+                name: '风格转换',
+                category: 'image-to-image',
+                template: '{{subject}} in {{style}}, professional, high quality',
+            },
+            {
+                name: '电影级平移',
+                category: 'image-to-video',
+                template: '{{motion_type}}, {{speed}}, smooth, cinematic',
+            },
+        ];
+
+        const presets = [
+            {
+                name: '赛博朋克霓虹',
+                category: '科幻',
+                color: 'from-blue-900 to-cyan-900',
+                icon: '🌃',
+                settings: { temperature: -30, saturation: 120, contrast: 140, brightness: 90 },
+            },
+            {
+                name: '黑暗恐怖',
+                category: '悬疑',
+                color: 'from-red-900 to-gray-900',
+                icon: '🌑',
+                settings: { temperature: -20, saturation: 70, contrast: 120, brightness: 60 },
+            },
+            {
+                name: '温暖浪漫',
+                category: '爱情',
+                color: 'from-pink-900 to-red-900',
+                icon: '🌅',
+                settings: { temperature: 40, saturation: 100, contrast: 95, brightness: 100 },
+            },
+            {
+                name: '动态冒险',
+                category: '动作',
+                color: 'from-yellow-700 to-orange-700',
+                icon: '⚡',
+                settings: { temperature: 10, saturation: 130, contrast: 130, brightness: 95 },
+            },
+        ];
+
+        function formatTime(ms) {
+            const seconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(seconds / 60);
+            return `${minutes}:${(seconds % 60).toString().padStart(2, '0')}`;
+        }
+
+        function copyToClipboard() {
+            navigator.clipboard.writeText(state.generatedPrompt).then(() => {
+                alert('已复制到剪贴板！');
+            });
+        }
+
+        function toggleTab(tab) {
+            state.activeTab = tab;
+            render();
+        }
+
+        function selectTemplate(index) {
+            state.selectedTemplate = index;
+            state.generatedPrompt = templates[index].template;
+            render();
+        }
+
+        function selectPreset(index) {
+            state.selectedPreset = index;
+            render();
+        }
+
+        function togglePlayPause() {
+            state.isPlaying = !state.isPlaying;
+            render();
+        }
+
+        function updateZoom(value) {
+            state.zoom = parseInt(value);
+            render();
+        }
+
+        function updateTime(e) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const percent = (e.clientX - rect.left) / rect.width;
+            state.currentTime = percent * 60000;
+            render();
+        }
+
+        function render() {
+            const app = document.getElementById('app');
+            
+            app.innerHTML = `
+                <div class="flex flex-col h-screen bg-gray-950 text-white">
+                    <!-- 工具栏 -->
+                    <div class="bg-gray-900 border-b border-gray-700 px-4 py-3">
+                        <div class="flex items-center justify-between gap-4">
+                            <!-- 左侧 -->
+                            <div class="flex items-center gap-2">
+                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded flex items-center gap-2 transition">
+                                    <i class="fas fa-file"></i>
+                                    <span class="text-sm">新建</span>
+                                </button>
+                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded flex items-center gap-2 transition">
+                                    <i class="fas fa-download"></i>
+                                    <span class="text-sm">导出</span>
+                                </button>
+                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded flex items-center gap-2 transition">
+                                    <i class="fas fa-share-alt"></i>
+                                    <span class="text-sm">分享</span>
+                                </button>
+                                <div class="w-px h-6 bg-gray-700"></div>
+                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded">
+                                    <i class="fas fa-undo"></i>
+                                </button>
+                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded">
+                                    <i class="fas fa-redo"></i>
+                                </button>
+                            </div>
+
+                            <!-- 中间 -->
+                            <div class="flex items-center gap-3">
+                                <button class="px-2 py-1 text-sm bg-gray-800 hover:bg-gray-700 rounded transition" onclick="updateZoom(Math.max(10, ${state.zoom} - 10))">−</button>
+                                <input type="range" min="10" max="200" value="${state.zoom}" onchange="updateZoom(this.value)" class="w-20 h-1 bg-gray-700 rounded appearance-none cursor-pointer" />
+                                <span class="w-12 text-center text-xs text-gray-400">${state.zoom}%</span>
+                                <button class="px-2 py-1 text-sm bg-gray-800 hover:bg-gray-700 rounded transition" onclick="updateZoom(Math.min(200, ${state.zoom} + 10))">+</button>
+                            </div>
+
+                            <!-- 右侧 -->
+                            <div class="flex items-center gap-2">
+                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded flex items-center gap-2 transition">
+                                    <i class="fas fa-sliders-h"></i>
+                                    <span class="text-sm">设置</span>
+                                </button>
+                                <button class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-sm hover:opacity-80 transition">M</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 主内容 -->
+                    <div class="flex flex-1 gap-4 p-4 overflow-hidden">
+                        <!-- 左侧编辑区 -->
+                        <div class="flex-1 flex flex-col gap-4">
+                            <!-- 画布 -->
+                            <div class="flex-1 bg-gray-900 rounded-lg border border-gray-700 overflow-auto flex items-center justify-center grid-pattern">
+                                <div class="text-center">
+                                    <div class="text-6xl mb-4">🎬</div>
+                                    <h1 class="text-3xl font-bold mb-2">MMVIDO</h1>
+                                    <p class="text-gray-400">AI 视频制作画布工具</p>
+                                    <p class="text-sm text-gray-500 mt-4">选择右侧的提示词或风格预设开始创作</p>
+                                </div>
+                            </div>
+
+                            <!-- 时间轴 -->
+                            <div class="h-48 bg-gray-900 p-4 rounded-lg border border-gray-700 space-y-4">
+                                <div class="flex items-center gap-4">
+                                    <button onclick="togglePlayPause()" class="p-2 bg-blue-600 hover:bg-blue-700 rounded transition">
+                                        <i class="fas fa-${state.isPlaying ? 'pause' : 'play'}"></i>
+                                    </button>
+                                    <button class="p-2 bg-gray-700 hover:bg-gray-600 rounded transition">
+                                        <i class="fas fa-step-backward"></i>
+                                    </button>
+                                    <button class="p-2 bg-gray-700 hover:bg-gray-600 rounded transition">
+                                        <i class="fas fa-step-forward"></i>
+                                    </button>
+                                    <button class="p-2 bg-gray-700 hover:bg-gray-600 rounded transition">
+                                        <i class="fas fa-volume-up"></i>
+                                    </button>
+                                    <div class="text-sm text-gray-300 ml-auto">${formatTime(state.currentTime)} / 1:00</div>
+                                </div>
+                                <div onclick="updateTime(event)" class="relative w-full h-1 bg-gray-700 rounded cursor-pointer group">
+                                    <div class="absolute h-full bg-blue-500 rounded" style="width: ${(state.currentTime / 60000) * 100}%"></div>
+                                </div>
+                                <div class="max-h-24 overflow-y-auto space-y-1">
+                                    ${['视频轨道', '音频轨道', '字幕轨道'].map(track => `
+                                        <div class="flex items-center gap-2 text-xs bg-gray-800 p-2 rounded">
+                                            <div class="w-20 text-gray-400 truncate">${track}</div>
+                                            <div class="flex-1 h-8 bg-gray-700 rounded"></div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 右侧面板 -->
+                        <div class="w-80 flex flex-col gap-4 overflow-hidden">
+                            <!-- 标签 -->
+                            <div class="flex gap-2 bg-gray-900 p-2 rounded-lg border border-gray-700">
+                                <button onclick="toggleTab('canvas')" class="flex-1 px-3 py-2 rounded flex items-center justify-center gap-1 transition ${state.activeTab === 'canvas' ? 'tab-active' : 'tab-inactive'}">
+                                    <i class="fas fa-image text-sm"></i>
+                                    <span class="text-xs">属性</span>
+                                </button>
+                                <button onclick="toggleTab('prompts')" class="flex-1 px-3 py-2 rounded flex items-center justify-center gap-1 transition ${state.activeTab === 'prompts' ? 'tab-active' : 'tab-inactive'}">
+                                    <i class="fas fa-wand-magic-sparkles text-sm"></i>
+                                    <span class="text-xs">提示词</span>
+                                </button>
+                                <button onclick="toggleTab('presets')" class="flex-1 px-3 py-2 rounded flex items-center justify-center gap-1 transition ${state.activeTab === 'presets' ? 'tab-active' : 'tab-inactive'}">
+                                    <i class="fas fa-palette text-sm"></i>
+                                    <span class="text-xs">风格</span>
+                                </button>
+                            </div>
+
+                            <!-- 内容 -->
+                            <div class="flex-1 overflow-y-auto space-y-4">
+                                ${state.activeTab === 'canvas' ? `
+                                    <div class="bg-gray-900 p-4 rounded-lg border border-gray-700 space-y-3">
+                                        <h3 class="font-bold text-lg">画布属性</h3>
+                                        <div class="space-y-3">
+                                            <div>
+                                                <label class="text-sm text-gray-400">分辨率</label>
+                                                <select class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm focus:outline-none focus:border-blue-500">
+                                                    <option>1920x1080 (16:9)</option>
+                                                    <option>1280x720 (16:9)</option>
+                                                    <option>1080x1920 (9:16)</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="text-sm text-gray-400">帧率</label>
+                                                <select class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm focus:outline-none focus:border-blue-500">
+                                                    <option>24 fps</option>
+                                                    <option>30 fps</option>
+                                                    <option>60 fps</option>
+                                                </select>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <input type="checkbox" id="preview" ${state.showPreview ? 'checked' : ''} class="w-4 h-4 rounded">
+                                                <label for="preview" class="text-sm text-gray-300">实时预览</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ` : ''}
+
+                                ${state.activeTab === 'prompts' ? `
+                                    <div class="bg-gray-900 p-4 rounded-lg border border-gray-700">
+                                        <h3 class="text-lg font-bold mb-3 flex items-center gap-2">
+                                            <i class="fas fa-wand-magic-sparkles"></i> 提示词模板
+                                        </h3>
+                                        <div class="grid grid-cols-1 gap-2 mb-4">
+                                            ${templates.map((t, i) => `
+                                                <button onclick="selectTemplate(${i})" class="p-3 rounded text-left transition ${state.selectedTemplate === i ? 'bg-blue-600 border border-blue-400' : 'bg-gray-800 border border-gray-700 hover:border-gray-600'}">
+                                                    <div class="font-semibold text-sm">${t.name}</div>
+                                                    <div class="text-xs text-gray-400">${t.category}</div>
+                                                </button>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+
+                                    <div class="bg-gray-900 p-4 rounded-lg border border-gray-700 space-y-3">
+                                        <h4 class="font-semibold">提示词内容</h4>
+                                        <div class="relative">
+                                            <textarea class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm font-mono text-gray-300 focus:outline-none focus:border-blue-500 resize-none" rows="4">${state.generatedPrompt}</textarea>
+                                            <button onclick="copyToClipboard()" class="absolute top-2 right-2 p-2 bg-blue-600 hover:bg-blue-700 rounded transition" title="复制">
+                                                <i class="fas fa-copy text-sm"></i>
+                                            </button>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <button class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded flex items-center justify-center gap-2 transition text-sm">
+                                                <i class="fas fa-wand-magic-sparkles"></i> 生成
+                                            </button>
+                                            <button class="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded flex items-center justify-center gap-2 transition text-sm">
+                                                <i class="fas fa-plus"></i> 添加
+                                            </button>
+                                        </div>
+                                    </div>
+                                ` : ''}
+
+                                ${state.activeTab === 'presets' ? `
+                                    <div class="bg-gray-900 p-4 rounded-lg border border-gray-700">
+                                        <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+                                            <i class="fas fa-palette"></i> 风格预设
+                                        </h3>
+                                        <div class="grid grid-cols-2 gap-3 mb-4">
+                                            ${presets.map((p, i) => `
+                                                <button onclick="selectPreset(${i})" class="relative rounded-lg overflow-hidden cursor-pointer transition ${state.selectedPreset === i ? 'ring-2 ring-blue-500' : ''}">
+                                                    <div class="w-full h-24 bg-gradient-to-br ${p.color} flex flex-col justify-between p-2">
+                                                        <div class="text-2xl">${p.icon}</div>
+                                                        <div>
+                                                            <div class="text-xs font-semibold">${p.name}</div>
+                                                            <div class="text-xs text-gray-400">${p.category}</div>
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+
+                                    <div class="bg-gray-900 p-4 rounded-lg border border-gray-700 space-y-4">
+                                        <div>
+                                            <h4 class="font-semibold mb-2">${presets[state.selectedPreset].name}</h4>
+                                            <p class="text-sm text-gray-400">完美适用于 ${presets[state.selectedPreset].category} 类型的视频</p>
+                                        </div>
+                                        <div class="space-y-3">
+                                            ${Object.entries(presets[state.selectedPreset].settings).map(([key, value]) => `
+                                                <div>
+                                                    <div class="flex justify-between text-sm mb-1">
+                                                        <span class="text-gray-400 capitalize">${key === 'temperature' ? '色温' : key === 'saturation' ? '饱和度' : key === 'contrast' ? '对比度' : '亮度'}</span>
+                                                        <span class="font-mono">${value}</span>
+                                                    </div>
+                                                    <div class="w-full h-2 bg-gray-800 rounded overflow-hidden">
+                                                        <div class="h-full bg-blue-500" style="width: ${Math.max(10, (value / 150) * 100)}%"></div>
+                                                    </div>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                        <div class="flex gap-2 pt-2">
+                                            <button class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded font-semibold transition text-sm">应用预设</button>
+                                            <button class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition">
+                                                <i class="fas fa-download"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 底部状态栏 -->
+                    <div class="bg-gray-900 border-t border-gray-700 px-4 py-2 text-xs text-gray-400">
+                        <div class="flex justify-between items-center">
+                            <div>项目: MMVIDO | 已准备</div>
+                            <div>✅ Ready</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 初始渲染
+        render();
+    </script>
+</body>
+</html>
