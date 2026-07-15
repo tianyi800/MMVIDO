@@ -13,6 +13,12 @@
             box-sizing: border-box;
         }
         
+        html, body, #app {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        
         body {
             background-color: #0a0a0a;
             color: white;
@@ -21,6 +27,7 @@
         
         ::-webkit-scrollbar {
             width: 8px;
+            height: 8px;
         }
         
         ::-webkit-scrollbar-track {
@@ -52,9 +59,39 @@
                 linear-gradient(90deg, transparent 24%, rgba(255, 0, 0, .05) 25%, rgba(255, 0, 0, .05) 26%, transparent 27%, transparent 74%, rgba(255, 0, 0, .05) 75%, rgba(255, 0, 0, .05) 76%, transparent 77%, transparent);
             background-size: 50px 50px;
         }
+
+        input[type="range"] {
+            width: 100%;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: none;
+        }
+
+        .template-btn {
+            transition: all 0.2s ease;
+        }
+
+        .template-btn:hover {
+            transform: translateY(-2px);
+        }
     </style>
 </head>
-<body class="bg-gray-950">
+<body>
     <div id="app"></div>
 
     <script>
@@ -68,21 +105,23 @@
             selectedTemplate: 0,
             selectedPreset: 0,
             generatedPrompt: '{{subject}}, {{style}}, {{lighting}}, masterpiece, 8k, cinematic',
+            resolution: '1920x1080',
+            frameRate: 30,
         };
 
         const templates = [
             {
-                name: '史诗级电影场景',
+                name: '文生图: 史诗级电影场景',
                 category: 'text-to-image',
                 template: '{{subject}}, {{style}}, {{lighting}}, masterpiece, 8k, cinematic',
             },
             {
-                name: '风格转换',
+                name: '图生图: 风格转换',
                 category: 'image-to-image',
                 template: '{{subject}} in {{style}}, professional, high quality',
             },
             {
-                name: '电影级平移',
+                name: '图生视频: 电影级平移',
                 category: 'image-to-video',
                 template: '{{motion_type}}, {{speed}}, smooth, cinematic',
             },
@@ -119,50 +158,70 @@
             },
         ];
 
+        // 工具函数
         function formatTime(ms) {
             const seconds = Math.floor(ms / 1000);
             const minutes = Math.floor(seconds / 60);
             return `${minutes}:${(seconds % 60).toString().padStart(2, '0')}`;
         }
 
-        function copyToClipboard() {
+        // 事件处理函数
+        window.copyToClipboard = function() {
             navigator.clipboard.writeText(state.generatedPrompt).then(() => {
-                alert('已复制到剪贴板！');
+                alert('✅ 已复制到剪贴板！');
+            }).catch(() => {
+                alert('❌ 复制失败');
             });
-        }
+        };
 
-        function toggleTab(tab) {
+        window.toggleTab = function(tab) {
             state.activeTab = tab;
             render();
-        }
+        };
 
-        function selectTemplate(index) {
+        window.selectTemplate = function(index) {
             state.selectedTemplate = index;
             state.generatedPrompt = templates[index].template;
             render();
-        }
+        };
 
-        function selectPreset(index) {
+        window.selectPreset = function(index) {
             state.selectedPreset = index;
             render();
-        }
+        };
 
-        function togglePlayPause() {
+        window.togglePlayPause = function() {
             state.isPlaying = !state.isPlaying;
             render();
-        }
+        };
 
-        function updateZoom(value) {
+        window.updateZoom = function(value) {
             state.zoom = parseInt(value);
             render();
-        }
+        };
 
-        function updateTime(e) {
+        window.updateTime = function(e) {
             const rect = e.currentTarget.getBoundingClientRect();
             const percent = (e.clientX - rect.left) / rect.width;
             state.currentTime = percent * 60000;
             render();
-        }
+        };
+
+        window.updatePrompt = function(e) {
+            state.generatedPrompt = e.target.value;
+        };
+
+        window.updateResolution = function(e) {
+            state.resolution = e.target.value;
+        };
+
+        window.updateFrameRate = function(e) {
+            state.frameRate = e.target.value;
+        };
+
+        window.togglePreview = function(e) {
+            state.showPreview = e.target.checked;
+        };
 
         function render() {
             const app = document.getElementById('app');
@@ -174,42 +233,42 @@
                         <div class="flex items-center justify-between gap-4">
                             <!-- 左侧 -->
                             <div class="flex items-center gap-2">
-                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded flex items-center gap-2 transition">
+                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded flex items-center gap-2 transition duration-200">
                                     <i class="fas fa-file"></i>
                                     <span class="text-sm">新建</span>
                                 </button>
-                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded flex items-center gap-2 transition">
+                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded flex items-center gap-2 transition duration-200">
                                     <i class="fas fa-download"></i>
                                     <span class="text-sm">导出</span>
                                 </button>
-                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded flex items-center gap-2 transition">
+                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded flex items-center gap-2 transition duration-200">
                                     <i class="fas fa-share-alt"></i>
                                     <span class="text-sm">分享</span>
                                 </button>
                                 <div class="w-px h-6 bg-gray-700"></div>
-                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded">
+                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded transition duration-200">
                                     <i class="fas fa-undo"></i>
                                 </button>
-                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded">
+                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded transition duration-200">
                                     <i class="fas fa-redo"></i>
                                 </button>
                             </div>
 
                             <!-- 中间 -->
                             <div class="flex items-center gap-3">
-                                <button class="px-2 py-1 text-sm bg-gray-800 hover:bg-gray-700 rounded transition" onclick="updateZoom(Math.max(10, ${state.zoom} - 10))">−</button>
-                                <input type="range" min="10" max="200" value="${state.zoom}" onchange="updateZoom(this.value)" class="w-20 h-1 bg-gray-700 rounded appearance-none cursor-pointer" />
+                                <button class="px-2 py-1 text-sm bg-gray-800 hover:bg-gray-700 rounded transition duration-200" onclick="updateZoom(Math.max(10, ${state.zoom} - 10))">−</button>
+                                <input type="range" min="10" max="200" value="${state.zoom}" onchange="updateZoom(this.value)" class="w-20 h-1 bg-gray-700 rounded cursor-pointer" />
                                 <span class="w-12 text-center text-xs text-gray-400">${state.zoom}%</span>
-                                <button class="px-2 py-1 text-sm bg-gray-800 hover:bg-gray-700 rounded transition" onclick="updateZoom(Math.min(200, ${state.zoom} + 10))">+</button>
+                                <button class="px-2 py-1 text-sm bg-gray-800 hover:bg-gray-700 rounded transition duration-200" onclick="updateZoom(Math.min(200, ${state.zoom} + 10))">+</button>
                             </div>
 
                             <!-- 右侧 -->
                             <div class="flex items-center gap-2">
-                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded flex items-center gap-2 transition">
+                                <button class="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded flex items-center gap-2 transition duration-200">
                                     <i class="fas fa-sliders-h"></i>
                                     <span class="text-sm">设置</span>
                                 </button>
-                                <button class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-sm hover:opacity-80 transition">M</button>
+                                <button class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-sm hover:opacity-80 transition duration-200">M</button>
                             </div>
                         </div>
                     </div>
@@ -229,18 +288,18 @@
                             </div>
 
                             <!-- 时间轴 -->
-                            <div class="h-48 bg-gray-900 p-4 rounded-lg border border-gray-700 space-y-4">
+                            <div class="h-48 bg-gray-900 p-4 rounded-lg border border-gray-700 space-y-4 overflow-auto">
                                 <div class="flex items-center gap-4">
-                                    <button onclick="togglePlayPause()" class="p-2 bg-blue-600 hover:bg-blue-700 rounded transition">
+                                    <button onclick="togglePlayPause()" class="p-2 bg-blue-600 hover:bg-blue-700 rounded transition duration-200" title="${state.isPlaying ? '暂停' : '播放'}">
                                         <i class="fas fa-${state.isPlaying ? 'pause' : 'play'}"></i>
                                     </button>
-                                    <button class="p-2 bg-gray-700 hover:bg-gray-600 rounded transition">
+                                    <button class="p-2 bg-gray-700 hover:bg-gray-600 rounded transition duration-200" title="上一帧">
                                         <i class="fas fa-step-backward"></i>
                                     </button>
-                                    <button class="p-2 bg-gray-700 hover:bg-gray-600 rounded transition">
+                                    <button class="p-2 bg-gray-700 hover:bg-gray-600 rounded transition duration-200" title="下一帧">
                                         <i class="fas fa-step-forward"></i>
                                     </button>
-                                    <button class="p-2 bg-gray-700 hover:bg-gray-600 rounded transition">
+                                    <button class="p-2 bg-gray-700 hover:bg-gray-600 rounded transition duration-200" title="音量">
                                         <i class="fas fa-volume-up"></i>
                                     </button>
                                     <div class="text-sm text-gray-300 ml-auto">${formatTime(state.currentTime)} / 1:00</div>
@@ -263,15 +322,15 @@
                         <div class="w-80 flex flex-col gap-4 overflow-hidden">
                             <!-- 标签 -->
                             <div class="flex gap-2 bg-gray-900 p-2 rounded-lg border border-gray-700">
-                                <button onclick="toggleTab('canvas')" class="flex-1 px-3 py-2 rounded flex items-center justify-center gap-1 transition ${state.activeTab === 'canvas' ? 'tab-active' : 'tab-inactive'}">
+                                <button onclick="toggleTab('canvas')" class="flex-1 px-3 py-2 rounded flex items-center justify-center gap-1 transition duration-200 ${state.activeTab === 'canvas' ? 'bg-blue-600 border border-blue-400' : 'bg-gray-800 hover:bg-gray-700'}">
                                     <i class="fas fa-image text-sm"></i>
                                     <span class="text-xs">属性</span>
                                 </button>
-                                <button onclick="toggleTab('prompts')" class="flex-1 px-3 py-2 rounded flex items-center justify-center gap-1 transition ${state.activeTab === 'prompts' ? 'tab-active' : 'tab-inactive'}">
+                                <button onclick="toggleTab('prompts')" class="flex-1 px-3 py-2 rounded flex items-center justify-center gap-1 transition duration-200 ${state.activeTab === 'prompts' ? 'bg-blue-600 border border-blue-400' : 'bg-gray-800 hover:bg-gray-700'}">
                                     <i class="fas fa-wand-magic-sparkles text-sm"></i>
                                     <span class="text-xs">提示词</span>
                                 </button>
-                                <button onclick="toggleTab('presets')" class="flex-1 px-3 py-2 rounded flex items-center justify-center gap-1 transition ${state.activeTab === 'presets' ? 'tab-active' : 'tab-inactive'}">
+                                <button onclick="toggleTab('presets')" class="flex-1 px-3 py-2 rounded flex items-center justify-center gap-1 transition duration-200 ${state.activeTab === 'presets' ? 'bg-blue-600 border border-blue-400' : 'bg-gray-800 hover:bg-gray-700'}">
                                     <i class="fas fa-palette text-sm"></i>
                                     <span class="text-xs">风格</span>
                                 </button>
@@ -281,27 +340,27 @@
                             <div class="flex-1 overflow-y-auto space-y-4">
                                 ${state.activeTab === 'canvas' ? `
                                     <div class="bg-gray-900 p-4 rounded-lg border border-gray-700 space-y-3">
-                                        <h3 class="font-bold text-lg">画布属性</h3>
+                                        <h3 class="font-bold text-lg">📐 画布属性</h3>
                                         <div class="space-y-3">
                                             <div>
                                                 <label class="text-sm text-gray-400">分辨率</label>
-                                                <select class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm focus:outline-none focus:border-blue-500">
-                                                    <option>1920x1080 (16:9)</option>
-                                                    <option>1280x720 (16:9)</option>
-                                                    <option>1080x1920 (9:16)</option>
+                                                <select onchange="updateResolution(event)" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm focus:outline-none focus:border-blue-500">
+                                                    <option value="1920x1080">1920x1080 (16:9)</option>
+                                                    <option value="1280x720">1280x720 (16:9)</option>
+                                                    <option value="1080x1920">1080x1920 (9:16)</option>
                                                 </select>
                                             </div>
                                             <div>
                                                 <label class="text-sm text-gray-400">帧率</label>
-                                                <select class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm focus:outline-none focus:border-blue-500">
-                                                    <option>24 fps</option>
-                                                    <option>30 fps</option>
-                                                    <option>60 fps</option>
+                                                <select onchange="updateFrameRate(event)" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm focus:outline-none focus:border-blue-500">
+                                                    <option value="24">24 fps</option>
+                                                    <option value="30" selected>30 fps</option>
+                                                    <option value="60">60 fps</option>
                                                 </select>
                                             </div>
                                             <div class="flex items-center gap-2">
-                                                <input type="checkbox" id="preview" ${state.showPreview ? 'checked' : ''} class="w-4 h-4 rounded">
-                                                <label for="preview" class="text-sm text-gray-300">实时预览</label>
+                                                <input type="checkbox" id="preview" onchange="togglePreview(event)" ${state.showPreview ? 'checked' : ''} class="w-4 h-4 rounded cursor-pointer">
+                                                <label for="preview" class="text-sm text-gray-300 cursor-pointer">✓ 实时预览</label>
                                             </div>
                                         </div>
                                     </div>
@@ -314,7 +373,7 @@
                                         </h3>
                                         <div class="grid grid-cols-1 gap-2 mb-4">
                                             ${templates.map((t, i) => `
-                                                <button onclick="selectTemplate(${i})" class="p-3 rounded text-left transition ${state.selectedTemplate === i ? 'bg-blue-600 border border-blue-400' : 'bg-gray-800 border border-gray-700 hover:border-gray-600'}">
+                                                <button onclick="selectTemplate(${i})" class="template-btn p-3 rounded text-left transition duration-200 ${state.selectedTemplate === i ? 'bg-blue-600 border border-blue-400' : 'bg-gray-800 border border-gray-700 hover:border-gray-600'}">
                                                     <div class="font-semibold text-sm">${t.name}</div>
                                                     <div class="text-xs text-gray-400">${t.category}</div>
                                                 </button>
@@ -323,18 +382,18 @@
                                     </div>
 
                                     <div class="bg-gray-900 p-4 rounded-lg border border-gray-700 space-y-3">
-                                        <h4 class="font-semibold">提示词内容</h4>
+                                        <h4 class="font-semibold">✍️ 提示词内容</h4>
                                         <div class="relative">
-                                            <textarea class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm font-mono text-gray-300 focus:outline-none focus:border-blue-500 resize-none" rows="4">${state.generatedPrompt}</textarea>
-                                            <button onclick="copyToClipboard()" class="absolute top-2 right-2 p-2 bg-blue-600 hover:bg-blue-700 rounded transition" title="复制">
+                                            <textarea onchange="updatePrompt(event)" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-sm font-mono text-gray-300 focus:outline-none focus:border-blue-500 resize-none" rows="4" placeholder="编辑您的提示词...">${state.generatedPrompt}</textarea>
+                                            <button onclick="copyToClipboard()" class="absolute top-2 right-2 p-2 bg-blue-600 hover:bg-blue-700 rounded transition duration-200" title="复制到剪贴板">
                                                 <i class="fas fa-copy text-sm"></i>
                                             </button>
                                         </div>
                                         <div class="flex gap-2">
-                                            <button class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded flex items-center justify-center gap-2 transition text-sm">
+                                            <button class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded flex items-center justify-center gap-2 transition duration-200 text-sm font-semibold">
                                                 <i class="fas fa-wand-magic-sparkles"></i> 生成
                                             </button>
-                                            <button class="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded flex items-center justify-center gap-2 transition text-sm">
+                                            <button class="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded flex items-center justify-center gap-2 transition duration-200 text-sm font-semibold">
                                                 <i class="fas fa-plus"></i> 添加
                                             </button>
                                         </div>
@@ -348,7 +407,7 @@
                                         </h3>
                                         <div class="grid grid-cols-2 gap-3 mb-4">
                                             ${presets.map((p, i) => `
-                                                <button onclick="selectPreset(${i})" class="relative rounded-lg overflow-hidden cursor-pointer transition ${state.selectedPreset === i ? 'ring-2 ring-blue-500' : ''}">
+                                                <button onclick="selectPreset(${i})" class="relative rounded-lg overflow-hidden cursor-pointer transition duration-200 ${state.selectedPreset === i ? 'ring-2 ring-blue-500' : 'hover:opacity-80'}">
                                                     <div class="w-full h-24 bg-gradient-to-br ${p.color} flex flex-col justify-between p-2">
                                                         <div class="text-2xl">${p.icon}</div>
                                                         <div>
@@ -364,24 +423,24 @@
                                     <div class="bg-gray-900 p-4 rounded-lg border border-gray-700 space-y-4">
                                         <div>
                                             <h4 class="font-semibold mb-2">${presets[state.selectedPreset].name}</h4>
-                                            <p class="text-sm text-gray-400">完美适用于 ${presets[state.selectedPreset].category} 类型的视频</p>
+                                            <p class="text-sm text-gray-400">💡 完美适用于 ${presets[state.selectedPreset].category} 类型的视频</p>
                                         </div>
                                         <div class="space-y-3">
                                             ${Object.entries(presets[state.selectedPreset].settings).map(([key, value]) => `
                                                 <div>
                                                     <div class="flex justify-between text-sm mb-1">
-                                                        <span class="text-gray-400 capitalize">${key === 'temperature' ? '色温' : key === 'saturation' ? '饱和度' : key === 'contrast' ? '对比度' : '亮度'}</span>
-                                                        <span class="font-mono">${value}</span>
+                                                        <span class="text-gray-400">${key === 'temperature' ? '🌡️ 色温' : key === 'saturation' ? '🎨 饱和度' : key === 'contrast' ? '⚫⚪ 对比度' : '☀️ 亮度'}</span>
+                                                        <span class="font-mono text-blue-400">${value}</span>
                                                     </div>
                                                     <div class="w-full h-2 bg-gray-800 rounded overflow-hidden">
-                                                        <div class="h-full bg-blue-500" style="width: ${Math.max(10, (value / 150) * 100)}%"></div>
+                                                        <div class="h-full bg-gradient-to-r from-blue-500 to-purple-500" style="width: ${Math.max(10, (value / 150) * 100)}%"></div>
                                                     </div>
                                                 </div>
                                             `).join('')}
                                         </div>
                                         <div class="flex gap-2 pt-2">
-                                            <button class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded font-semibold transition text-sm">应用预设</button>
-                                            <button class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition">
+                                            <button class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded font-semibold transition duration-200 text-sm">✓ 应用预设</button>
+                                            <button class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition duration-200">
                                                 <i class="fas fa-download"></i>
                                             </button>
                                         </div>
@@ -394,8 +453,8 @@
                     <!-- 底部状态栏 -->
                     <div class="bg-gray-900 border-t border-gray-700 px-4 py-2 text-xs text-gray-400">
                         <div class="flex justify-between items-center">
-                            <div>项目: MMVIDO | 已准备</div>
-                            <div>✅ Ready</div>
+                            <div>📁 项目: MMVIDO | 分辨率: ${state.resolution} | 帧率: ${state.frameRate}fps</div>
+                            <div>✅ 系统就绪</div>
                         </div>
                     </div>
                 </div>
